@@ -1,0 +1,90 @@
+# ============================================
+# Node.js
+# ============================================
+
+# Dependency directories
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# ============================================
+# Environment files
+# ============================================
+
+# Local environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================
+# Build & Output
+# ============================================
+
+# Build output
+dist/
+build/
+out/
+coverage/
+.cache/
+.tmp/
+
+# ============================================
+# Logs & Databases
+# ============================================
+
+logs/
+*.log
+*.csv
+*.sqlite
+*.sqlite3
+*.db
+dump.rdb
+
+# ============================================
+# OS / Editor Files
+# ============================================
+
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
+
+# ============================================
+# Uploads / User files (if any)
+# ============================================
+
+uploads/
+public/uploads/
+temp/
+tmp/
+
+# ============================================
+# Misc
+# ============================================
+
+# dotenv override files
+.envrc
+.env.*
+!.env.example
+# sensitive configs
+config/*.js
+
+# Local test files
+test-results/
+jest-cache/
+jest-stare/
+
+# PM2 logs
+pids/
+*.pid
+*.seed
+*.pid.lock
