@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { FriendRequest } from "../models/friendRequest.model.js";
 import { Chat } from "../models/Chat.model.js";
 import { emitSocketEvent } from "./socket.controller.js";
+import { ChatEventEnum } from "../../constants.js";
 
 // ✅ Send Friend Request
 export const sendFriendRequest = asyncHandler(async (req, res) => {
@@ -14,7 +15,7 @@ export const sendFriendRequest = asyncHandler(async (req, res) => {
   if (senderId.toString() === receiverId.toString())
     throw new ApiError(400, "Cannot send request to yourself");
 
-  // 🟨 Check existing
+  // 🟡 Check if a request already exists (either direction)
   const existing = await FriendRequest.findOne({
     $or: [
       { sender: senderId, receiver: receiverId },
@@ -23,19 +24,21 @@ export const sendFriendRequest = asyncHandler(async (req, res) => {
   });
 
   if (existing) {
-    if (existing.status === "pending") {
-      throw new ApiError(400, "Friend request already pending");
-    }
-
-    // Reuse old request
+    // Update it to pending again
     existing.status = "pending";
     existing.sender = senderId;
     existing.receiver = receiverId;
     await existing.save();
 
-    emitSocketEvent(req, receiverId.toString(), "friend_request_received", {
+    console.log("request sent")
+    console.log(receiverId)
+
+    // ✅ Emit socket event correctly
+    emitSocketEvent(req, receiverId.toString(), ChatEventEnum.NEW_REQUEST, {
       requestId: existing._id,
       senderId,
+      status: "pending",
+      type: "NEW_REQUEST", // <-- useful for frontend handler
     });
 
     return res
@@ -43,21 +46,24 @@ export const sendFriendRequest = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, existing, "Friend request resent"));
   }
 
-  // 🟩 Create new
+  // 🟩 Create new request
   const newRequest = await FriendRequest.create({
     sender: senderId,
     receiver: receiverId,
   });
-
-  emitSocketEvent(req, receiverId.toString(), "friend_request_received", {
+console.log("request sent 2")
+  // ✅ Emit to receiver’s room
+  emitSocketEvent(req, receiverId.toString(), ChatEventEnum.NEW_REQUEST, {
     requestId: newRequest._id,
     senderId,
+    status: "pending",
+    type: "NEW_REQUEST",
   });
-
   return res
     .status(201)
     .json(new ApiResponse(201, newRequest, "Friend request sent"));
 });
+
 
 // ✅ Accept Friend Request
 export const acceptFriendRequest = asyncHandler(async (req, res) => {
@@ -71,36 +77,30 @@ export const acceptFriendRequest = asyncHandler(async (req, res) => {
   if (request.receiver.toString() !== userId.toString())
     throw new ApiError(403, "Not authorized to accept this request");
 
-  // ✅ 1️⃣ Update request status
   request.status = "accepted";
   await request.save({ validateBeforeSave: false });
 
-  // ✅ 2️⃣ Reactivate chat if previously inactive
-  const reactivateChat = async (userA, userB) => {
-    const chat = await Chat.findOne({
-      isGroup: false,
-      participants: { $all: [userA, userB] },
-    });
-
-    if (chat) {
-      chat.inactiveFor = chat.inactiveFor.filter(
-        (id) =>
-          id.toString() !== userA.toString() &&
-          id.toString() !== userB.toString()
-      );
-      await chat.save({ validateBeforeSave: false });
-    }
-  };
-
-  await reactivateChat(request.sender, request.receiver);
-
-  // ✅ 3️⃣ Notify sender
-  emitSocketEvent(req, request.sender.toString(), "friend_request_accepted", {
-    requestId: request._id,
-    receiverId: userId,
+  // Reactivate chat if exists
+  const chat = await Chat.findOne({
+    isGroup: false,
+    participants: { $all: [request.sender, request.receiver] },
   });
 
-  // ✅ 4️⃣ Respond
+  if (chat) {
+    chat.inactiveFor = chat.inactiveFor.filter(
+      (id) =>
+        id.toString() !== request.sender.toString() &&
+        id.toString() !== request.receiver.toString()
+    );
+    await chat.save({ validateBeforeSave: false });
+  }
+
+  emitSocketEvent(req, request.sender.toString(), ChatEventEnum.STATUS_UPDATE, {
+    requestId: request._id,
+    receiverId: userId,
+    status: "accepted",
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, request, "Friend request accepted"));
@@ -115,17 +115,16 @@ export const rejectFriendRequest = asyncHandler(async (req, res) => {
 
   const request = await FriendRequest.findById(requestId);
   if (!request) throw new ApiError(404, "Request not found");
-
   if (request.receiver.toString() !== receiverId.toString())
     throw new ApiError(403, "You cannot reject this request");
 
   request.status = "rejected";
   await request.save({ validateBeforeSave: false });
 
-  // 🚀 Notify sender
-  emitSocketEvent(req, request.sender.toString(), "friend_request_rejected", {
+  emitSocketEvent(req, request.sender.toString(), ChatEventEnum.STATUS_UPDATE, {
     requestId,
     receiverId,
+    status: "rejected",
   });
 
   return res

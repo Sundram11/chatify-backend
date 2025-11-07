@@ -38,9 +38,6 @@ export const createOneToOneChatId = async (user1Id, user2Id) => {
   return newChat;
 };
 
-/**
- * 3️⃣ Find group chat by groupId
- */
 export const findGroupChatId = async (groupId) => {
   if (!groupId) throw new ApiError(400, "groupId is required");
 
@@ -51,9 +48,6 @@ export const findGroupChatId = async (groupId) => {
   return chat._id;
 };
 
-/**
- * 4️⃣ Create group chat
- */
 export const createGroupChatId = async ({ name, participantIds, adminId }) => {
   if (!name || !participantIds?.length || !adminId) {
     throw new ApiError(400, "Group name, participants, and admin are required");

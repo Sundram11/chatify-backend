@@ -85,7 +85,7 @@ export const initializeSocketIO = (io) => {
 
       const userSockets = connectedUsers.get(userId);
       userSockets.add(socket.id);
-
+    
       socket.join(userId); // personal room for direct emits
       console.log(`🟢 ${user.fullName} connected (${userSockets.size} sockets)`);
 
@@ -117,5 +117,7 @@ export const emitSocketEvent = (req, roomId, event, payload) => {
     console.error("❌ Socket.io not initialized");
     return;
   }
+  
+
   io.to(roomId).emit(event, payload);
 };
